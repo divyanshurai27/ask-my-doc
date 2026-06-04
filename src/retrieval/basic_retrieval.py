@@ -154,10 +154,13 @@ class BasicRetriever:
             reverse=True
         )[:k]
         
+        # Map chunk IDs to Document objects
+        doc_map = {doc.metadata.get("chunk_id"): doc for doc, _ in vector_results + bm25_results}
+        
         # Convert back to Document objects
         results = []
         for doc_id, score in top_docs:
-            doc = vector_dict.get(doc_id) or bm25_dict.get(doc_id)
+            doc = doc_map.get(doc_id)
             if doc:
                 results.append((doc, score))
         

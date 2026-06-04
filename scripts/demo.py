@@ -70,7 +70,16 @@ class RAGPipeline:
         logger.info(f"Ingesting documents from {directory}")
         
         # Load documents
-        self.loaded_documents = self.loaders.load_documents(directory)
+        path = Path(directory)
+        file_paths = []
+        if path.is_dir():
+            for f in path.glob("**/*"):
+                if f.is_file() and f.suffix.lower() in ['.pdf', '.md', '.markdown', '.txt']:
+                    file_paths.append(str(f))
+        else:
+            file_paths = [directory]
+            
+        self.loaded_documents = self.loaders.load_documents(file_paths)
         logger.info(f"Loaded {len(self.loaded_documents)} documents")
         
         # Chunk documents
