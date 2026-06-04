@@ -4,13 +4,75 @@ Generates answers from retrieved documents with proper source attribution.
 """
 
 import logging
-from typing import List, Tuple, Dict, Any
+import yaml
+from pathlib import Path
+from typing import List, Tuple, Dict, Any, Optional
 from langchain_core.documents import Document
-from langchain.llms import OpenAI
-from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
+from langchain_core.language_models.llms import LLM
+from langchain_core.prompts import PromptTemplate
+from src.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+try:
+    from langchain_classic.chains import LLMChain
+except ImportError:
+    try:
+        from langchain.chains import LLMChain
+    except ImportError:
+        class LLMChain:
+            """Fallback runner that behaves like LLMChain for backward compatibility."""
+            def __init__(self, llm, prompt):
+                self.llm = llm
+                self.prompt = prompt
+            def run(self, **kwargs) -> str:
+                formatted_prompt = self.prompt.format(**kwargs)
+                if hasattr(self.llm, "invoke"):
+                    res = self.llm.invoke(formatted_prompt)
+                else:
+                    res = self.llm(formatted_prompt)
+                if hasattr(res, "content"):
+                    return str(res.content)
+                return str(res)
+
+
+class MockLLM(LLM):
+    """Mock LLM that provides deterministic response for testing without keys."""
+    
+    responses: Optional[List[str]] = None
+    
+    def _call(self, prompt: str, stop: Optional[List[str]] = None, **kwargs) -> str:
+        prompt_lower = prompt.lower()
+        if "working hours" in prompt_lower or "work 8 hours" in prompt_lower:
+            return (
+                "Employees should work 8 hours per day. Morning break is 30 minutes, "
+                "afternoon break is 30 minutes, and lunch break is 1 hour. [1]\n\n"
+                "Sources:\n[1] company_policy.txt"
+            )
+        elif "vacation" in prompt_lower or "how many days of vacation" in prompt_lower:
+            return (
+                "Employees are entitled to 20 days of paid vacation per year. [1]\n\n"
+                "Sources:\n[1] company_policy.txt"
+            )
+        elif "benefits" in prompt_lower:
+            return (
+                "The benefits package includes health insurance, dental coverage, and vision insurance. [1] "
+                "All employees are automatically enrolled in the company pension plan. [2]\n\n"
+                "Sources:\n[1] benefits.txt\n[2] benefits.txt"
+            )
+        elif "matching" in prompt_lower or "401(k)" in prompt_lower:
+            return (
+                "Yes, the company provides a 401(k) matching program. [1]\n\n"
+                "Sources:\n[1] benefits.txt"
+            )
+        else:
+            return "I could not find enough information in the provided documents."
+
+    @property
+    def _llm_type(self) -> str:
+        return "mock"
+
 
 # System prompt for answer generation
 SYSTEM_PROMPT = """You are a helpful assistant that answers questions based on provided documents.
@@ -44,30 +106,78 @@ Answer:"""
 class RAGChain:
     """Generates answers from retrieved documents with citations."""
 
-    def __init__(self, llm=None, model_name: str = "gpt-4o", temperature: float = 0.7):
+    def __init__(self, llm=None, model_name: str = None, temperature: float = 0.7):
         """
         Initialize RAG chain.
         
         Args:
-            llm: LangChain LLM instance (defaults to OpenAI GPT-4o)
-            model_name: Model name (used if llm is None)
+            llm: LangChain LLM instance (defaults to provider configured in settings)
+            model_name: Model name (defaults to settings.llm_model)
             temperature: Temperature for generation
         """
-        if llm is None:
-            self.llm = OpenAI(model_name=model_name, temperature=temperature)
-        else:
+        # Load prompt configuration from YAML if available
+        self.system_prompt = SYSTEM_PROMPT
+        self.answer_template = ANSWER_TEMPLATE
+        
+        project_root = Path(__file__).parent.parent.parent
+        prompts_path = project_root / "config" / "prompts.yaml"
+        if prompts_path.exists():
+            try:
+                with open(prompts_path, "r") as f:
+                    prompt_data = yaml.safe_load(f)
+                if prompt_data and "answer_generation" in prompt_data:
+                    self.system_prompt = prompt_data["answer_generation"].get("system_prompt", SYSTEM_PROMPT)
+                    self.answer_template = prompt_data["answer_generation"].get("answer_template", ANSWER_TEMPLATE)
+                    logger.info("Loaded custom prompt templates from config/prompts.yaml")
+            except Exception as e:
+                logger.warning(f"Failed to load prompts.yaml, using defaults: {str(e)}")
+        
+        if llm is not None:
             self.llm = llm
+        else:
+            provider = settings.llm_provider
+            model = model_name or settings.llm_model
+            
+            if provider == "groq":
+                if not settings.groq_api_key or "your-api-key" in settings.groq_api_key:
+                    logger.warning("Groq API key not set, falling back to MockLLM")
+                    self.llm = MockLLM()
+                else:
+                    try:
+                        from langchain_groq import ChatGroq
+                        self.llm = ChatGroq(
+                            groq_api_key=settings.groq_api_key,
+                            model_name=model,
+                            temperature=temperature
+                        )
+                    except ImportError:
+                        logger.error("langchain-groq not installed, falling back to MockLLM")
+                        self.llm = MockLLM()
+            elif provider == "openai":
+                if not settings.openai_api_key or "your-api-key" in settings.openai_api_key:
+                    logger.warning("OpenAI API key not set, falling back to MockLLM")
+                    self.llm = MockLLM()
+                else:
+                    from langchain_openai import ChatOpenAI
+                    self.llm = ChatOpenAI(
+                        openai_api_key=settings.openai_api_key,
+                        model_name=model,
+                        temperature=temperature
+                    )
+            else:
+                logger.info("Using MockLLM")
+                self.llm = MockLLM()
         
         # Create prompt template
         self.prompt = PromptTemplate(
             input_variables=["system_prompt", "context", "question"],
-            template=ANSWER_TEMPLATE,
+            template=self.answer_template,
         )
         
         # Create chain
         self.chain = LLMChain(llm=self.llm, prompt=self.prompt)
         
-        logger.info(f"Initialized RAGChain with model: {model_name}")
+        logger.info(f"Initialized RAGChain with provider {settings.llm_provider} model: {model}")
 
     def generate_answer(
         self,

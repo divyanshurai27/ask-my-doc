@@ -32,12 +32,7 @@ class VectorStore:
         self.embedding_model = SentenceTransformer(self.embedding_model_name)
         
         # Initialize ChromaDB with persistent storage
-        settings = Settings(
-            chroma_db_impl="duckdb+parquet",
-            persist_directory=persist_dir,
-            anonymized_telemetry=False,
-        )
-        self.client = chromadb.Client(settings)
+        self.client = chromadb.PersistentClient(path=persist_dir)
         
         # Get or create collection
         self.collection = self.client.get_or_create_collection(
