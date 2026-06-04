@@ -18,8 +18,10 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
     
     # ===== LLM Configuration =====
+    llm_provider: str = Field(default="groq", env="LLM_PROVIDER")
     openai_api_key: str = Field(default="", env="OPENAI_API_KEY")
-    llm_model: str = Field(default="gpt-4o", env="LLM_MODEL")
+    groq_api_key: str = Field(default="", env="GROQ_API_KEY")
+    llm_model: str = Field(default="llama3-8b-8192", env="LLM_MODEL")
     
     # ===== Embedding Configuration =====
     embedding_model: str = Field(
@@ -50,6 +52,10 @@ class Settings(BaseSettings):
     debug: bool = Field(default=False, env="DEBUG")
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
     
+    @property
+    def vector_store_path(self) -> str:
+        return self.chroma_db_path
+    
     class Config:
         env_file = ".env"
         case_sensitive = False
@@ -67,11 +73,18 @@ def get_settings() -> Settings:
 # Validate required settings
 def validate_settings():
     """Validate that required settings are configured."""
-    if not settings.openai_api_key or settings.openai_api_key == "sk-your-api-key-here":
-        raise ValueError(
-            "OPENAI_API_KEY is not configured. "
-            "Please set it in .env file or environment variable."
-        )
+    if settings.llm_provider == "groq":
+        if not settings.groq_api_key or "your-api-key" in settings.groq_api_key:
+            raise ValueError(
+                "GROQ_API_KEY is not configured. "
+                "Please set it in .env file or environment variable."
+            )
+    elif settings.llm_provider == "openai":
+        if not settings.openai_api_key or "your-api-key" in settings.openai_api_key:
+            raise ValueError(
+                "OPENAI_API_KEY is not configured. "
+                "Please set it in .env file or environment variable."
+            )
 
 
 if __name__ == "__main__":
