@@ -55,6 +55,7 @@ logs/
 # Evaluation results
 eval_results.json
 eval_results/
+data/evaluation_results.json
 
 # OS
 Thumbs.db

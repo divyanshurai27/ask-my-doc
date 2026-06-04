@@ -62,6 +62,16 @@ class TestPhase1Integration:
         with tempfile.TemporaryDirectory() as tmpdir:
             store = VectorStore(persist_dir=tmpdir)
             yield store
+            # Release ChromaDB resources to unlock files on Windows
+            if hasattr(store, "client") and store.client:
+                if hasattr(store.client, "_system"):
+                    try:
+                        store.client._system.stop()
+                    except Exception:
+                        pass
+            store.client = None
+            import gc
+            gc.collect()
 
     def test_loaders_integration(self, sample_documents):
         """Test document loaders."""
