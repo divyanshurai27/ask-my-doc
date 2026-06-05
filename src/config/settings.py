@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     llm_provider: str = Field(default="groq", env="LLM_PROVIDER")
     openai_api_key: str = Field(default="", env="OPENAI_API_KEY")
     groq_api_key: str = Field(default="", env="GROQ_API_KEY")
-    llm_model: str = Field(default="llama3-8b-8192", env="LLM_MODEL")
+    llm_model: str = Field(default="llama-3.1-8b-instant", env="LLM_MODEL")
     
     # ===== Embedding Configuration =====
     embedding_model: str = Field(

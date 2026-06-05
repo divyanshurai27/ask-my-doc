@@ -20,6 +20,166 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+def patch_langchain_imports():
+    """
+    Dynamically patch legacy LangChain imports for ragas compatibility with modern LangChain versions (0.2+ / 1.x).
+    Bypasses 'ModuleNotFoundError: No module named langchain.callbacks' and similar legacy module import errors.
+    """
+    # Patch asyncio event loop on Windows to avoid ProactorEventLoop hangs with redirected streams
+    import os
+    if os.name == 'nt':
+        import asyncio
+        try:
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        except Exception:
+            pass
+
+    # Patch numpy.intersect1d for numpy 2.x compatibility with ragas 0.0.22 dataclasses
+    import numpy as np
+    if not hasattr(np, '_orig_intersect1d'):
+        np._orig_intersect1d = np.intersect1d
+        np.intersect1d = lambda *args, **kwargs: list(np._orig_intersect1d(*args, **kwargs))
+
+    import sys
+    import types
+    
+    # 1. Mock BaseChatModel and BaseLLM namespaces
+    try:
+        from langchain_core.language_models.chat_models import BaseChatModel
+        from langchain_core.language_models.llms import BaseLLM
+    except ImportError:
+        return
+        
+    DummyClass = type('DummyClass', (object,), {})
+    
+    # langchain.chat_models.base
+    if 'langchain.chat_models.base' not in sys.modules:
+        l_cm_base = types.ModuleType('langchain.chat_models.base')
+        l_cm_base.BaseChatModel = BaseChatModel
+        sys.modules['langchain.chat_models.base'] = l_cm_base
+        
+    # langchain.chat_models
+    if 'langchain.chat_models' not in sys.modules:
+        l_cm = types.ModuleType('langchain.chat_models')
+        l_cm.BaseChatModel = BaseChatModel
+        l_cm.AzureChatOpenAI = DummyClass
+        l_cm.BedrockChat = DummyClass
+        l_cm.ChatOpenAI = DummyClass
+        l_cm.ChatVertexAI = DummyClass
+        sys.modules['langchain.chat_models'] = l_cm
+        
+    # langchain.llms.base
+    if 'langchain.llms.base' not in sys.modules:
+        l_llm_base = types.ModuleType('langchain.llms.base')
+        l_llm_base.BaseLLM = BaseLLM
+        sys.modules['langchain.llms.base'] = l_llm_base
+        
+    # langchain.llms
+    if 'langchain.llms' not in sys.modules:
+        l_llm = types.ModuleType('langchain.llms')
+        l_llm.BaseLLM = BaseLLM
+        l_llm.AmazonAPIGateway = DummyClass
+        l_llm.AzureOpenAI = DummyClass
+        l_llm.Bedrock = DummyClass
+        l_llm.OpenAI = DummyClass
+        l_llm.VertexAI = DummyClass
+        sys.modules['langchain.llms'] = l_llm
+        
+    # 2. Mock langchain.embeddings
+    if 'langchain.embeddings' not in sys.modules:
+        try:
+            from langchain_openai import OpenAIEmbeddings, AzureOpenAIEmbeddings
+        except ImportError:
+            OpenAIEmbeddings = DummyClass
+            AzureOpenAIEmbeddings = DummyClass
+        l_emb = types.ModuleType('langchain.embeddings')
+        l_emb.AzureOpenAIEmbeddings = AzureOpenAIEmbeddings
+        l_emb.OpenAIEmbeddings = OpenAIEmbeddings
+        sys.modules['langchain.embeddings'] = l_emb
+        
+    # 3. Mock langchain.schema package and subpackages
+    if 'langchain.schema' not in sys.modules:
+        try:
+            import langchain_core.outputs as l_core_out
+            LLMResult = l_core_out.LLMResult
+            Generation = l_core_out.Generation
+        except ImportError:
+            LLMResult = DummyClass
+            Generation = DummyClass
+            
+        l_schema = types.ModuleType('langchain.schema')
+        l_schema.__path__ = []
+        l_schema.LLMResult = LLMResult
+        l_schema.Generation = Generation
+        l_schema.RUN_KEY = 'run_id'
+        sys.modules['langchain.schema'] = l_schema
+        
+    if 'langchain.schema.embeddings' not in sys.modules:
+        try:
+            import langchain_core.embeddings as l_core_emb
+            Embeddings = l_core_emb.Embeddings
+        except ImportError:
+            Embeddings = DummyClass
+        l_schema_emb = types.ModuleType('langchain.schema.embeddings')
+        l_schema_emb.Embeddings = Embeddings
+        sys.modules['langchain.schema.embeddings'] = l_schema_emb
+        
+    if 'langchain.schema.output' not in sys.modules:
+        try:
+            import langchain_core.outputs as l_core_out
+            Generation = l_core_out.Generation
+            LLMResult = l_core_out.LLMResult
+        except ImportError:
+            Generation = DummyClass
+            LLMResult = DummyClass
+        l_schema_out = types.ModuleType('langchain.schema.output')
+        l_schema_out.Generation = Generation
+        l_schema_out.LLMResult = LLMResult
+        sys.modules['langchain.schema.output'] = l_schema_out
+        
+    if 'langchain.schema.document' not in sys.modules:
+        try:
+            import langchain_core.documents as l_core_doc
+            Document = l_core_doc.Document
+        except ImportError:
+            Document = DummyClass
+        l_schema_doc = types.ModuleType('langchain.schema.document')
+        l_schema_doc.Document = Document
+        sys.modules['langchain.schema.document'] = l_schema_doc
+        
+    # 4. Mock callbacks and prompts
+    if 'langchain.callbacks' not in sys.modules:
+        try:
+            import langchain_core.callbacks as lcc
+            sys.modules['langchain.callbacks'] = lcc
+            sys.modules['langchain.callbacks.manager'] = lcc.manager
+        except ImportError:
+            pass
+            
+    if 'langchain.prompts' not in sys.modules:
+        try:
+            import langchain_core.prompts as lcp
+            sys.modules['langchain.prompts'] = lcp
+        except ImportError:
+            pass
+
+    # 5. Mock adapters
+    if 'langchain.adapters' not in sys.modules:
+        l_adapters = types.ModuleType('langchain.adapters')
+        l_adapters.__path__ = []
+        sys.modules['langchain.adapters'] = l_adapters
+        
+    if 'langchain.adapters.openai' not in sys.modules:
+        try:
+            import langchain_community.adapters.openai as l_comm_openai
+            convert_message_to_dict = l_comm_openai.convert_message_to_dict
+        except ImportError:
+            convert_message_to_dict = DummyClass
+        l_adapters_openai = types.ModuleType('langchain.adapters.openai')
+        l_adapters_openai.convert_message_to_dict = convert_message_to_dict
+        sys.modules['langchain.adapters.openai'] = l_adapters_openai
+
+
 def run_evaluation():
     logger.info("Initializing Evaluation using Golden Dataset...")
     
@@ -57,6 +217,7 @@ def run_evaluation():
     scores = {}
     if has_keys:
         try:
+            patch_langchain_imports()
             from ragas import evaluate
             from ragas.metrics import faithfulness, answer_relevancy, context_precision, context_recall
             from datasets import Dataset
@@ -70,6 +231,32 @@ def run_evaluation():
             }
             ragas_dataset = Dataset.from_dict(data_dict)
             
+            # Setup evaluation models
+            eval_llm = None
+            eval_embeddings = None
+            
+            if settings.llm_provider == "groq" and settings.groq_api_key and "your-api-key" not in settings.groq_api_key:
+                from langchain_groq import ChatGroq
+                from ragas.llms import LangchainLLM
+                from ragas.embeddings import HuggingfaceEmbeddings
+                logger.info(f"Configuring RAGAS to use Groq LLM ({settings.llm_model}) and local HuggingFace embeddings...")
+                eval_llm = ChatGroq(
+                    groq_api_key=settings.groq_api_key,
+                    model_name=settings.llm_model,
+                    temperature=0
+                )
+                ragas_llm = LangchainLLM(llm=eval_llm)
+                eval_embeddings = HuggingfaceEmbeddings(
+                    model_name=settings.embedding_model
+                )
+                
+                # Assign custom model configurations to Ragas metrics
+                faithfulness.llm = ragas_llm
+                answer_relevancy.llm = ragas_llm
+                answer_relevancy.embeddings = eval_embeddings
+                context_precision.llm = ragas_llm
+                context_recall.llm = ragas_llm
+            
             logger.info("Running RAGAS evaluation...")
             eval_result = evaluate(
                 ragas_dataset,
@@ -82,7 +269,9 @@ def run_evaluation():
                 "context_recall": float(eval_result["context_recall"]),
             }
         except Exception as e:
-            logger.warning(f"RAGAS evaluation failed or was not fully configured: {str(e)}. Falling back to mock scores.")
+            import traceback
+            logger.warning("RAGAS evaluation failed or was not fully configured:")
+            traceback.print_exc()
             has_keys = False
             
     if not has_keys:

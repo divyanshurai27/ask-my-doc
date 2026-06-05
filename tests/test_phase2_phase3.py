@@ -15,11 +15,11 @@ def test_groq_settings_loading():
     settings = Settings(
         llm_provider="groq",
         groq_api_key="gsk_test_key_123",
-        llm_model="llama3-8b-8192"
+        llm_model="llama-3.1-8b-instant"
     )
     assert settings.llm_provider == "groq"
     assert settings.groq_api_key == "gsk_test_key_123"
-    assert settings.llm_model == "llama3-8b-8192"
+    assert settings.llm_model == "llama-3.1-8b-instant"
 
 
 def test_settings_validation_groq():
@@ -57,7 +57,7 @@ def test_rag_chain_with_mock_llm(monkeypatch):
     from src.config import settings
     monkeypatch.setattr(settings, "groq_api_key", "your-api-key-here")
     
-    rag = RAGChain(model_name="llama3-8b-8192")
+    rag = RAGChain(model_name="llama-3.1-8b-instant")
     assert isinstance(rag.llm, MockLLM)
     
     # Test generation using mock answers
