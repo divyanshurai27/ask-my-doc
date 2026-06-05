@@ -234,6 +234,33 @@ def demo_basic_usage():
             logger.error(f"Error processing query: {str(e)}")
             logger.info("Tip: Ensure OpenAI API key is set in .env file")
     
+        except Exception as e:
+            logger.error(f"Error processing query: {str(e)}")
+
+    # GitHub Actions Non-Interactive Mode
+    if len(sys.argv) > 1:
+        question = sys.argv[1]
+        logger.info("\n" + "=" * 70)
+        logger.info(f"NON-INTERACTIVE CLI MODE (Question: {question})")
+        logger.info("=" * 70)
+        
+        try:
+            logger.info(f"\nProcessing query...")
+            result = pipeline.query(question, top_k=3, retrieval_method="hybrid")
+            
+            logger.info(f"\nANSWER:\n{result['answer']}")
+            logger.info(f"\nSOURCES ({len(result['sources'])}):")
+            for source in result['sources']:
+                logger.info(f"  [{source['index']}] {source['source']}")
+        except Exception as e:
+            logger.error(f"Error processing query: {str(e)}")
+            sys.exit(1)
+            
+        logger.info("\n" + "=" * 70)
+        logger.info("DEMO COMPLETE")
+        logger.info("=" * 70)
+        return
+
     logger.info("\n" + "=" * 70)
     logger.info("INTERACTIVE CLI MODE")
     logger.info("=" * 70)
