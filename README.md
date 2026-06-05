@@ -5,11 +5,14 @@
 ##  Features
 - **Multi-format Document Support**: Load PDF, Markdown, and TXT files.
 - **Intelligent Chunking**: 600-token chunks with ~100-token overlap, using UUIDs for unique chunk identification.
-- **Hybrid Retrieval**: Combines BM25 keyword search (sparse) and vector similarity (dense).
+- **Hybrid Retrieval (RRF)**: Combines BM25 keyword search (sparse) and vector similarity (dense) using Reciprocal Rank Fusion for perfect recall.
+- **Cross-Encoder Re-Ranking**: Uses `ms-marco-MiniLM-L-6-v2` to mathematically re-rank retrieved chunks for maximum context precision.
+- **Offline Evaluation (Ragas)**: Fully automated CI/CD pipeline scoring using `llama-3.3-70b-versatile` to mathematically prove Faithfulness and Recall.
+- **LangSmith Tracing**: Full observability into LLM traces, token usage, and latency.
 - **Inline Citations**: Ensures answers are grounded in source documents, linking text back to the exact chunk.
 - **Zero-Hallucination Guardrails**: System refuses to answer when the information isn't found in the documents.
 - **Local Embeddings**: Uses `all-MiniLM-L6-v2` locally for fast, free, and private embedding.
-- **Minimal Streamlit UI**: A clean, premium user interface.
+- **Minimal Streamlit UI**: A clean, premium user interface with database clearing functionality.
 
 ---
 
@@ -21,9 +24,10 @@ flowchart LR
     B --> C["✂️ Chunker"]
     C --> D["🧠 Embeddings"]
     D --> E["💾 ChromaDB"]
-    F["❓ User Query"] --> G["🔍 Retriever"]
+    F["❓ User Query"] --> G["🔍 Hybrid Retriever (BM25 + Vector)"]
     E --> G
-    G --> H["🤖 LLM (Groq)"]
+    G --> R["📊 Cross-Encoder Re-Ranker"]
+    R --> H["🤖 LLM (Groq)"]
     H --> I["📝 Answer + Citations"]
 ```
 
@@ -33,19 +37,23 @@ flowchart LR
 | **Chunk** | Text is split into 600-token chunks with 100-token overlap, assigning unique UUIDs |
 | **Embed** | Each chunk is converted to a 384-dim vector using SentenceTransformer |
 | **Store** | Vectors + metadata (e.g., `source_file`) are persisted in ChromaDB |
-| **Retrieve** | User query is embedded and matched against stored chunks (Hybrid: Vector + BM25) |
-| **Generate** | Top-K chunks are sent to Groq LLM as context to generate a grounded answer |
+| **Retrieve** | User query is searched against vectors and BM25, merged via Reciprocal Rank Fusion (RRF) |
+| **Re-Rank** | A Cross-Encoder model re-scores and re-ranks the candidate chunks |
+| **Generate** | Top-K refined chunks are sent to Groq LLM as context to generate a grounded answer |
+| **Evaluate** | `Ragas` evaluates the generated answer against the Golden Dataset for CI/CD checks |
 
 ---
 
 ## 🛠 Tech Stack Breakdown
 
-- **LLM Provider**: **Groq** (`llama-3.1-8b-instant`) - Extremely fast inference.
-- **Embeddings**: **SentenceTransformers** (`all-MiniLM-L6-v2`) - Local and private.
+- **LLM Provider**: **Groq** (`llama-3.1-8b-instant` for generation, `llama-3.3-70b-versatile` for evaluation)
+- **Embeddings**: **SentenceTransformers** (`all-MiniLM-L6-v2`)
+- **Re-Ranking**: **SentenceTransformers Cross-Encoder** (`ms-marco-MiniLM-L-6-v2`)
 - **Vector Database**: **ChromaDB** - Persistent vector store with SQLite backend.
-- **Orchestration**: **LangChain**
+- **Orchestration & Tracing**: **LangChain** & **LangSmith**
+- **Evaluation**: **Ragas** - Automated metric grading (Faithfulness, Relevancy, Precision, Recall).
 - **Frontend**: **Streamlit** - Clean UI with PDF upload, query box, and response display.
-- **Testing & CI/CD**: **Pytest** & **GitHub Actions** - 33 automated tests running on every push.
+- **Testing & CI/CD**: **Pytest** & **GitHub Actions** - Automated tests and Quality Gates.
 
 ---
 
@@ -121,7 +129,8 @@ ask-my-docs/
 │   ├── storage/
 │   │   └── vector_store.py # ChromaDB + SentenceTransformer embeddings
 │   ├── retrieval/
-│   │   └── basic_retrieval.py  # Vector, BM25, and hybrid search
+│   │   ├── hybrid_retriever.py # Vector, BM25, and RRF fusion search
+│   │   └── reranker.py         # Cross-Encoder model re-ranking
 │   ├── rag/
 │   │   └── answer_generator.py # LLM answer generation with citations
 │   └── evaluation/

@@ -161,13 +161,30 @@ if pipeline_error:
     st.stop()
 
 # --- PDF Upload ---
-st.markdown('<div class="section-label">Upload Document</div>', unsafe_allow_html=True)
-uploaded_file = st.file_uploader(
-    "Drop a PDF here",
-    type=["pdf"],
-    label_visibility="collapsed",
-    key="pdf_upload"
-)
+st.markdown('<div class="section-label">Manage Documents</div>', unsafe_allow_html=True)
+
+col1, col2 = st.columns([3, 1])
+with col1:
+    uploaded_file = st.file_uploader(
+        "Drop a PDF here",
+        type=["pdf"],
+        label_visibility="collapsed",
+        key="pdf_upload"
+    )
+with col2:
+    if st.button("🗑️ Clear Database", use_container_width=True, help="Deletes all stored documents from the database"):
+        try:
+            if pipeline and pipeline.vector_store:
+                pipeline.vector_store.delete_collection()
+            if "ingested_files" in st.session_state:
+                st.session_state.ingested_files = set()
+            for f in UPLOAD_DIR.glob("*"):
+                if f.is_file() and f.name != ".gitkeep":
+                    f.unlink()
+            st.success("Database cleared!")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Failed to clear database: {e}")
 
 if uploaded_file:
     safe_filename = Path(uploaded_file.name).name

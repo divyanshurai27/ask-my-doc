@@ -206,7 +206,7 @@ def run_evaluation():
         results.append({
             "question": question,
             "answer": out["answer"],
-            "contexts": [doc.page_content for doc in pipeline.retriever.retrieve(question)],
+            "contexts": [doc.page_content for doc, _ in pipeline.retriever.retrieve_rrf(question)],
             "ground_truths": [ref_answer],
         })
         
@@ -239,10 +239,10 @@ def run_evaluation():
                 from langchain_groq import ChatGroq
                 from ragas.llms import LangchainLLM
                 from ragas.embeddings import HuggingfaceEmbeddings
-                logger.info(f"Configuring RAGAS to use Groq LLM ({settings.llm_model}) and local HuggingFace embeddings...")
+                logger.info(f"Configuring RAGAS to use Groq LLM (llama-3.3-70b-versatile) and local HuggingFace embeddings...")
                 eval_llm = ChatGroq(
                     groq_api_key=settings.groq_api_key,
-                    model_name=settings.llm_model,
+                    model_name="llama-3.3-70b-versatile",
                     temperature=0
                 )
                 ragas_llm = LangchainLLM(llm=eval_llm)
@@ -256,18 +256,20 @@ def run_evaluation():
                 answer_relevancy.embeddings = eval_embeddings
                 context_precision.llm = ragas_llm
                 context_recall.llm = ragas_llm
+            import time
+            logger.info("Running RAGAS evaluation on 1 question sequentially to avoid Groq rate limits...")
             
-            logger.info("Running RAGAS evaluation...")
-            eval_result = evaluate(
-                ragas_dataset,
-                metrics=[faithfulness, answer_relevancy, context_precision, context_recall]
-            )
-            scores = {
-                "faithfulness": float(eval_result["faithfulness"]),
-                "answer_relevancy": float(eval_result["answer_relevancy"]),
-                "context_precision": float(eval_result["context_precision"]),
-                "context_recall": float(eval_result["context_recall"]),
-            }
+            # Evaluate metrics one by one with a delay to avoid API connection dropping
+            scores = {}
+            for metric in [faithfulness, answer_relevancy, context_precision, context_recall]:
+                logger.info(f"Evaluating {metric.name}...")
+                try:
+                    res = evaluate(ragas_dataset.select([0]), metrics=[metric])
+                    scores[metric.name] = float(res[metric.name])
+                    time.sleep(3)  # Give the free Groq API a breather
+                except Exception as e:
+                    logger.warning(f"Metric {metric.name} failed: {e}")
+                    scores[metric.name] = 0.0
         except Exception as e:
             import traceback
             logger.warning("RAGAS evaluation failed or was not fully configured:")

@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class ReRanker:
     """Re-rank documents using cross-encoder models."""
 
-    def __init__(self, model_name: str = "cross-encoder/mmarco-MiniLMv2-L12-H384-v30"):
+    def __init__(self, model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"):
         """
         Initialize ReRanker.
         

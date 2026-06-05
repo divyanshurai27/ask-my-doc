@@ -15,7 +15,8 @@ from src.config import Settings
 from src.ingestion.loaders import DocumentLoaders
 from src.ingestion.chunking import DocumentChunker
 from src.storage.vector_store import VectorStore
-from src.retrieval.basic_retrieval import BasicRetriever
+from src.retrieval.hybrid_retriever import HybridRetriever
+from src.retrieval.reranker import ReRanker
 from src.rag.answer_generator import RAGChain
 from langchain_core.documents import Document
 
@@ -49,7 +50,8 @@ class RAGPipeline:
             persist_dir=self.config.vector_store_path,
             embedding_model=self.config.embedding_model
         )
-        self.retriever = BasicRetriever(self.vector_store)
+        self.retriever = HybridRetriever(self.vector_store)
+        self.reranker = ReRanker()
         self.rag_chain = RAGChain(model_name=self.config.llm_model)
         
         self.loaded_documents = []
@@ -116,15 +118,25 @@ class RAGPipeline:
         
         # Retrieve documents
         if retrieval_method == "vector":
-            retrieved = self.retriever.retrieve(question, k=top_k)
+            retrieved_scores = self.retriever.retrieve_vector(question, k=top_k * 2)
         elif retrieval_method == "bm25":
-            retrieved = [doc for doc, _ in self.retriever.retrieve_bm25(question, k=top_k)]
+            retrieved_scores = self.retriever.retrieve_bm25(question, k=top_k * 2)
         elif retrieval_method == "hybrid":
-            retrieved = [doc for doc, _ in self.retriever.retrieve_hybrid(question, k=top_k)]
+            retrieved_scores = self.retriever.retrieve_rrf(question, k=top_k * 2)
         else:
-            retrieved = self.retriever.retrieve(question, k=top_k)
+            retrieved_scores = self.retriever.retrieve_vector(question, k=top_k * 2)
+            
+        # Extract just documents
+        docs_to_rerank = [doc for doc, _ in retrieved_scores]
         
-        logger.info(f"Retrieved {len(retrieved)} documents")
+        # Re-rank using Cross-Encoder
+        if docs_to_rerank:
+            reranked = self.reranker.rerank(question, docs_to_rerank, top_k=top_k)
+            retrieved = [doc for doc, _ in reranked]
+        else:
+            retrieved = []
+        
+        logger.info(f"Retrieved and re-ranked to {len(retrieved)} documents")
         
         # Generate answer
         result = self.rag_chain.generate_answer(question, retrieved)
