@@ -181,7 +181,7 @@ def demo_basic_usage():
         return
     
     # Ingest documents
-    logger.info("\n1️⃣ INGESTION PHASE")
+    logger.info("\n1. INGESTION PHASE")
     logger.info("-" * 70)
     num_docs = pipeline.ingest_documents(str(sample_dir))
     
@@ -190,7 +190,7 @@ def demo_basic_usage():
         return
     
     # Show statistics
-    logger.info("\n2️⃣ STATISTICS")
+    logger.info("\n2. STATISTICS")
     logger.info("-" * 70)
     stats = pipeline.get_stats()
     logger.info(f"Documents loaded: {stats['loaded_documents']}")
@@ -198,14 +198,14 @@ def demo_basic_usage():
     logger.info(f"Vector store: {stats['vector_store']}")
     
     # Show chunk statistics
-    logger.info("\n3️⃣ CHUNK ANALYSIS")
+    logger.info("\n3. CHUNK ANALYSIS")
     logger.info("-" * 70)
     chunk_stats = pipeline.chunker.get_chunk_stats(pipeline.chunked_documents)
     logger.info(f"Average chunk size: {chunk_stats['avg_chunk_size']:.0f} characters")
     logger.info(f"Average chunk size: {chunk_stats['avg_chunk_size_words']:.0f} words")
     
     # Example queries
-    logger.info("\n4️⃣ EXAMPLE QUERIES")
+    logger.info("\n4. EXAMPLE QUERIES")
     logger.info("-" * 70)
     
     # These are example queries - they'll only work if sample docs contain relevant content
@@ -222,18 +222,44 @@ def demo_basic_usage():
         try:
             result = pipeline.query(query, top_k=3, retrieval_method="vector")
             
-            logger.info(f"\n✅ ANSWER:\n{result['answer'][:500]}...")
-            logger.info(f"\n📚 SOURCES ({len(result['sources'])}):")
+            logger.info(f"\nANSWER:\n{result['answer'][:500]}...")
+            logger.info(f"\nSOURCES ({len(result['sources'])}):")
             for source in result['sources']:
                 logger.info(f"  [{source['index']}] {source['source']}")
             
-            logger.info(f"\n✔️ VALIDATION:")
+            logger.info(f"\nVALIDATION:")
             for key, value in result['validation'].items():
                 logger.info(f"  {key}: {value}")
         except Exception as e:
             logger.error(f"Error processing query: {str(e)}")
             logger.info("Tip: Ensure OpenAI API key is set in .env file")
     
+    logger.info("\n" + "=" * 70)
+    logger.info("INTERACTIVE CLI MODE")
+    logger.info("=" * 70)
+    logger.info("Type 'exit' or 'quit' to close the program.")
+    
+    while True:
+        try:
+            user_query = input("\nAsk a question: ").strip()
+            if user_query.lower() in ['exit', 'quit']:
+                break
+            if not user_query:
+                continue
+                
+            logger.info(f"\nProcessing query...")
+            result = pipeline.query(user_query, top_k=3, retrieval_method="hybrid")
+            
+            logger.info(f"\nANSWER:\n{result['answer']}")
+            logger.info(f"\nSOURCES ({len(result['sources'])}):")
+            for source in result['sources']:
+                logger.info(f"  [{source['index']}] {source['source']}")
+                
+        except KeyboardInterrupt:
+            break
+        except Exception as e:
+            logger.error(f"Error processing query: {str(e)}")
+
     logger.info("\n" + "=" * 70)
     logger.info("DEMO COMPLETE")
     logger.info("=" * 70)
