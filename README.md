@@ -2,7 +2,7 @@
 
 **Ask My Docs** is a domain-specific **Retrieval-Augmented Generation (RAG)** system. You upload documents (PDFs, text files, markdown), and it lets you ask natural language questions — returning AI-generated answers with **inline citations** back to the source documents, ensuring trustworthiness and minimizing hallucinations.
 
-## ✨ Features
+##  Features
 - **Multi-format Document Support**: Load PDF, Markdown, and TXT files.
 - **Intelligent Chunking**: 600-token chunks with ~100-token overlap, using UUIDs for unique chunk identification.
 - **Hybrid Retrieval**: Combines BM25 keyword search (sparse) and vector similarity (dense).
@@ -13,7 +13,7 @@
 
 ---
 
-## 🏗 Architecture (End-to-End Pipeline)
+##  Architecture (End-to-End Pipeline)
 
 ```mermaid
 flowchart LR
