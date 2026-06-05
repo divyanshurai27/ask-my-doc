@@ -52,8 +52,11 @@ def test_prompt_yaml_exists():
     assert "answer_template" in data["answer_generation"]
 
 
-def test_rag_chain_with_mock_llm():
+def test_rag_chain_with_mock_llm(monkeypatch):
     """Test RAGChain with Mock LLM fallback."""
+    from src.config import settings
+    monkeypatch.setattr(settings, "groq_api_key", "your-api-key-here")
+    
     rag = RAGChain(model_name="llama3-8b-8192")
     assert isinstance(rag.llm, MockLLM)
     

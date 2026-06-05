@@ -139,7 +139,7 @@ class RAGChain:
             model = model_name or settings.llm_model
             
             if provider == "groq":
-                if not settings.groq_api_key or "your-api-key" in settings.groq_api_key:
+                if not settings.groq_api_key or "your-api-key" in settings.groq_api_key or "gsk_abcYtEf0rY" in settings.groq_api_key:
                     logger.warning("Groq API key not set, falling back to MockLLM")
                     self.llm = MockLLM()
                 else:
@@ -280,6 +280,7 @@ class RAGChain:
                 "source": source_file,
                 "chunk_id": chunk_id,
                 "type": source_type,
+                "content": doc.page_content,
             })
         
         # Append sources to answer if not already present
