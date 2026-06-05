@@ -6,6 +6,7 @@ Implements intelligent text splitting with configurable size and overlap.
 from typing import List, Dict, Any
 import logging
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+import uuid
 from langchain_core.documents import Document
 
 logger = logging.getLogger(__name__)
@@ -94,7 +95,8 @@ class DocumentChunker:
                     # Preserve original metadata
                     **document.metadata,
                     # Add chunking metadata
-                    "chunk_id": f"{source_file}_{i}",
+                    "chunk_id": str(uuid.uuid4()),
+                    "source_file": source_file,
                     "chunk_index": i,
                     "total_chunks": len(chunk_texts),
                     "chunk_size": len(chunk_text),
