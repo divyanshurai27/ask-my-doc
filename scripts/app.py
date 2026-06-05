@@ -1,118 +1,147 @@
 import streamlit as st
 import os
 import sys
-import shutil
 import logging
 from pathlib import Path
+
+# Disable progress bars and force offline model loading for Streamlit compatibility.
+os.environ["TQDM_DISABLE"] = "1"
+os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
+os.environ["TRANSFORMERS_VERBOSITY"] = "error"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+os.environ["HF_HUB_OFFLINE"] = "1"
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.config import settings, Settings
+from src.config import Settings
 from scripts.demo import RAGPipeline
 
 # Setup logs
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- Streamlit Page Configuration ---
+# --- Page Config ---
 st.set_page_config(
-    page_title="Ask My Docs - Interactive RAG Dashboard",
-    page_icon="🤖",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    page_title="Ask My Docs",
+    page_icon="📄",
+    layout="centered",
+    initial_sidebar_state="collapsed"
 )
 
-# --- Premium Custom Styling (Vanilla CSS) ---
+# --- Minimal Premium Styling ---
 st.markdown("""
 <style>
-    /* Custom Google Font */
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Plus+Jakarta+Sans:wght@300;400;500;700&display=swap');
-    
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
     html, body, [class*="css"] {
-        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-family: 'Inter', sans-serif;
     }
-    
-    h1, h2, h3 {
-        font-family: 'Outfit', sans-serif;
+
+    /* Hide default Streamlit elements for cleaner look */
+    #MainMenu, footer, header { visibility: hidden; }
+
+    /* App container */
+    .block-container {
+        max-width: 720px;
+        padding-top: 3rem;
+        padding-bottom: 3rem;
+    }
+
+    /* Title */
+    .app-title {
+        font-size: 2rem;
         font-weight: 700;
+        color: #1a1a2e;
+        margin-bottom: 0.2rem;
+        letter-spacing: -0.5px;
     }
-    
-    /* Main Layout Styling */
-    .main-header {
-        background: linear-gradient(135deg, #4F46E5 0%, #06B6D4 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        font-size: 2.8rem;
-        font-weight: 800;
-        margin-bottom: 0.5rem;
+    .app-subtitle {
+        color: #8b8fa3;
+        font-size: 0.95rem;
+        margin-bottom: 2.5rem;
     }
-    
-    .subtitle {
-        color: #6B7280;
-        font-size: 1.1rem;
-        margin-bottom: 2rem;
-    }
-    
-    /* Card Glassmorphism Styling */
-    .metric-card {
-        background: rgba(79, 70, 229, 0.08);
-        border: 1px solid rgba(79, 70, 229, 0.2);
+
+    /* Upload area */
+    .stFileUploader > div > div {
+        border: 2px dashed #d1d5db;
         border-radius: 12px;
-        padding: 1.5rem;
-        text-align: center;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-        transition: transform 0.2s, box-shadow 0.2s;
+        background: #fafbfc;
+        transition: border-color 0.2s;
     }
-    
-    .metric-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+    .stFileUploader > div > div:hover {
+        border-color: #6366f1;
     }
-    
-    /* Answer Display Container */
-    .answer-box {
-        background: rgba(79, 70, 229, 0.1);
-        border-left: 5px solid #4F46E5;
-        border-radius: 8px;
-        padding: 1.5rem;
+
+    /* Answer card */
+    .answer-card {
+        background: linear-gradient(135deg, #f8f9ff 0%, #f0f1ff 100%);
+        border: 1px solid #e0e2ff;
+        border-radius: 14px;
+        padding: 1.5rem 1.8rem;
         margin-top: 1rem;
-        margin-bottom: 1.5rem;
+        line-height: 1.7;
+        color: #1a1a2e;
+        font-size: 0.95rem;
     }
-    
-    /* Badge styling */
-    .badge {
+
+    /* Source chip */
+    .source-chip {
         display: inline-block;
-        padding: 0.25rem 0.6rem;
-        border-radius: 50px;
-        font-size: 0.8rem;
-        font-weight: 600;
-        margin-right: 0.5rem;
+        background: #eef0ff;
+        color: #4f46e5;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.78rem;
+        font-weight: 500;
+        margin: 0.2rem 0.3rem 0.2rem 0;
+        border: 1px solid #d9ddff;
     }
-    .badge-success { background-color: #DEF7EC; color: #03543F; }
-    .badge-warning { background-color: #FEF3C7; color: #92400E; }
-    .badge-info { background-color: #E1EFFE; color: #1E429F; }
-    .badge-error { background-color: #FDE8E8; color: #9B1C1C; }
-    
+
+    /* Section label */
+    .section-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: #9ca3af;
+        margin-bottom: 0.6rem;
+    }
+
+    /* Status pill */
+    .status-pill {
+        display: inline-block;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.78rem;
+        font-weight: 500;
+    }
+    .status-ok { background: #ecfdf5; color: #065f46; }
+    .status-err { background: #fef2f2; color: #991b1b; }
+
+    /* Divider */
+    .soft-divider {
+        height: 1px;
+        background: #e5e7eb;
+        margin: 2rem 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# --- App Directories Setup ---
+# --- App Directories ---
 UPLOAD_DIR = Path(__file__).parent.parent / "data" / "uploaded_docs"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 SAMPLE_DIR = Path(__file__).parent.parent / "data" / "sample_docs"
 
-# Initialize RAG pipeline using streamlit session state caching
+# --- Pipeline Init ---
 @st.cache_resource
 def get_pipeline():
     config = Settings()
     pipeline = RAGPipeline(config)
-    
-    # Pre-populate with sample documents if directory exists
     if SAMPLE_DIR.exists():
-        logger.info("Initializing vector store with sample documents...")
+        logger.info("Initializing with sample documents...")
         pipeline.ingest_documents(str(SAMPLE_DIR))
-        
     return pipeline
 
 try:
@@ -123,183 +152,74 @@ except Exception as e:
     pipeline_error = e
     logger.exception("Failed to initialize RAG Pipeline")
 
-# --- Sidebar UI ---
-with st.sidebar:
-    st.image("https://img.icons8.com/nolan/96/bot.png", width=70)
-    st.markdown("### **Ask My Docs Configuration**")
-    st.caption("Customize the production RAG pipeline settings in real-time.")
-    
-    st.divider()
-    
-    # 1. Retrieval Parameters
-    st.markdown("#### **1. Retrieval Engine**")
-    retrieval_method = st.selectbox(
-        "Search Algorithm",
-        options=["hybrid", "vector", "bm25"],
-        format_func=lambda x: {
-            "hybrid": "Hybrid (Sparse + Dense Fusion)",
-            "vector": "Dense Vector Search",
-            "bm25": "Sparse BM25 Search"
-        }[x],
-        help="Hybrid search merges keyword and conceptual similarity for maximum recall."
-    )
-    
-    top_k = st.slider("Top K Retrieved Chunks", min_value=1, max_value=10, value=settings.top_k_retrieval)
-    
-    st.divider()
-    
-    # 2. Document Uploads
-    st.markdown("#### **2. Add Source Documents**")
-    st.caption("Upload custom PDF, TXT, or Markdown documents to index them into ChromaDB.")
-    
-    uploaded_files = st.file_uploader(
-        "Choose files",
-        type=["pdf", "txt", "md", "markdown"],
-        accept_multiple_files=True
-    )
-    
-    if uploaded_files:
-        if st.button("🚀 Index Uploaded Files", use_container_width=True):
-            with st.spinner("Ingesting and indexing documents..."):
-                try:
-                    # Save files to disk
-                    saved_count = 0
-                    for uploaded_file in uploaded_files:
-                        # Extract only the base filename to prevent Errno 22 on Windows if full paths are passed
-                        safe_filename = Path(uploaded_file.name).name
-                        file_path = UPLOAD_DIR / safe_filename
-                        with open(file_path, "wb") as f:
-                            f.write(uploaded_file.getbuffer())
-                        saved_count += 1
-                    
-                    # Run ingestion
-                    if saved_count > 0:
-                        total_ingested = pipeline.ingest_documents(str(UPLOAD_DIR))
-                        st.success(f"Successfully indexed {saved_count} documents into ChromaDB!")
-                        st.balloons()
-                        # Force refresh stats
-                        st.rerun()
-                except Exception as ex:
-                    logger.exception("Error during ingestion")
-                    st.error(f"Error during ingestion: {str(ex)}")
-                    st.exception(ex)
-                    
-    st.divider()
-    
-    # 3. System Status
-    st.markdown("#### **3. Pipeline Status**")
-    if pipeline:
-        stats = pipeline.get_stats()
-        st.success("🟢 Active & Ready")
-        st.metric(label="Total Chunks in ChromaDB", value=stats["vector_store"]["total_documents"])
-        
-        # Display current provider config
-        provider_name = settings.llm_provider
-        is_mock = "langchain-groq" not in sys.modules and (not settings.groq_api_key or "your-api-key" in settings.groq_api_key)
-        
-        if is_mock:
-            st.warning(f"⚠️ Offline Fallback (Mock LLM)")
-        else:
-            st.info(f"⚡ LLM Provider: {provider_name.capitalize()}")
-    else:
-        st.error("🔴 Initialization Failed")
-
-# --- Main Page UI ---
-st.markdown('<div class="main-header">🤖 Ask My Docs</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle">An enterprise-ready, auditable RAG system that answers questions with precise inline citations and automated verification.</div>', unsafe_allow_html=True)
+# --- Header ---
+st.markdown('<div class="app-title">📄 Ask My Docs</div>', unsafe_allow_html=True)
+st.markdown('<div class="app-subtitle">Upload a PDF and ask questions — get answers with source citations.</div>', unsafe_allow_html=True)
 
 if pipeline_error:
-    st.error("### Failed to initialize RAG Pipeline")
-    st.exception(pipeline_error)
+    st.error(f"Pipeline failed to initialize: {pipeline_error}")
     st.stop()
 
-# Quick Info Banner on how the pipeline is set up
-col1, col2, col3, col4 = st.columns(4)
-with col1:
-    st.markdown('<div class="metric-card">🎯 <b>Hybrid Search</b><br><small>Keyword + Vector Fusion</small></div>', unsafe_allow_html=True)
-with col2:
-    st.markdown('<div class="metric-card">🔍 <b>Cross-Encoder</b><br><small>SBERT Reranker Model</small></div>', unsafe_allow_html=True)
-with col3:
-    st.markdown('<div class="metric-card">📌 <b>Inline Citations</b><br><small>Strict source grounding</small></div>', unsafe_allow_html=True)
-with col4:
-    st.markdown('<div class="metric-card">🚀 <b>Zero-Hallucination</b><br><small>Confidence Gated Refusals</small></div>', unsafe_allow_html=True)
-
-st.write("")
-st.write("")
-
-# --- Ask Question Section ---
-st.markdown("### 💬 Ask a Question")
-user_query = st.text_input(
-    "Enter a query based on the loaded company policy, benefits guide, or your uploaded files:",
-    placeholder="e.g., How many days of paid vacation do I get? or Summary of benefits..."
+# --- PDF Upload ---
+st.markdown('<div class="section-label">Upload Document</div>', unsafe_allow_html=True)
+uploaded_file = st.file_uploader(
+    "Drop a PDF here",
+    type=["pdf"],
+    label_visibility="collapsed",
+    key="pdf_upload"
 )
 
-# Preset Quick Queries
-st.markdown("<small>💡 **Try these sample queries:**</small>", unsafe_allow_html=True)
-preset_cols = st.columns(3)
-with preset_cols[0]:
-    if st.button("📅 What are the company's working hours?", use_container_width=True):
-        user_query = "What are the company's working hours?"
-with preset_cols[1]:
-    if st.button("🌴 How many days of vacation do I get?", use_container_width=True):
-        user_query = "How many days of vacation are employees entitled to?"
-with preset_cols[2]:
-    if st.button("💰 Does the company offer a 401(k) match?", use_container_width=True):
-        user_query = "Does the company offer a matching program?"
+if uploaded_file:
+    safe_filename = Path(uploaded_file.name).name
+    file_path = UPLOAD_DIR / safe_filename
 
+    # Only ingest if not already processed this session
+    if "ingested_files" not in st.session_state:
+        st.session_state.ingested_files = set()
+
+    if safe_filename not in st.session_state.ingested_files:
+        with open(file_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        with st.spinner("Indexing document..."):
+            pipeline.ingest_documents(str(UPLOAD_DIR))
+        st.session_state.ingested_files.add(safe_filename)
+        st.success(f"✓ **{safe_filename}** indexed successfully")
+    else:
+        st.markdown(f'<span class="status-pill status-ok">✓ {safe_filename} ready</span>', unsafe_allow_html=True)
+
+# --- Divider ---
+st.markdown('<div class="soft-divider"></div>', unsafe_allow_html=True)
+
+# --- Question Box ---
+st.markdown('<div class="section-label">Ask a Question</div>', unsafe_allow_html=True)
+user_query = st.text_input(
+    "Your question",
+    placeholder="e.g. What are the key skills mentioned in the resume?",
+    label_visibility="collapsed"
+)
+
+# --- Answer ---
 if user_query:
-    with st.spinner("Retrieving document chunks and generating answer..."):
+    with st.spinner("Thinking..."):
         try:
-            # Query the RAG Pipeline
-            result = pipeline.query(
-                user_query,
-                top_k=top_k,
-                retrieval_method=retrieval_method
-            )
-            
-            # --- Render RAG Answer ---
-            st.markdown("#### **Response Answer**")
-            st.markdown(f'<div class="answer-box">{result["answer"]}</div>', unsafe_allow_html=True)
-            
-            # --- Render Citations & Validation Badge Bar ---
-            st.markdown("#### **Verification & Quality Badges**")
-            val = result["validation"]
-            
-            badges_html = ""
-            if val["is_valid"]:
-                badges_html += '<span class="badge badge-success">✓ Valid Citation Schema</span>'
-            else:
-                badges_html += '<span class="badge badge-error">✗ Invalid Citation Schema</span>'
-                
-            if val["grounded"]:
-                badges_html += '<span class="badge badge-success">✓ Fully Grounded (No Hallucinations)</span>'
-            else:
-                badges_html += '<span class="badge badge-warning">⚠️ Grounding Mismatch Found</span>'
-                
-            if val["is_refusal"]:
-                badges_html += '<span class="badge badge-info">ℹ️ System Refusal triggered</span>'
-            else:
-                badges_html += f'<span class="badge badge-info">ℹ️ Citations Found: {val["citation_count"]}</span>'
-                
-            badges_html += f'<span class="badge badge-info">ℹ️ Engine: {result["retrieval_method"].upper()}</span>'
-            st.markdown(badges_html, unsafe_allow_html=True)
-            
-            st.write("")
-            st.write("")
-            
-            # --- Display Retrieved Source Materials ---
-            st.markdown("#### 📚 Reference Sources")
-            for idx, source in enumerate(result["sources"], 1):
-                with st.expander(f"Source [{idx}] - {source['source']}"):
-                    st.write(f"**Document**: `{source['source']}`")
-                    st.write(f"**Chunk Context**:")
-                    # Retrieve the content from pipeline retrieved list if not explicitly in result['sources']
-                    # Let's search retrieved docs in pipeline
-                    content = source.get("content", "")
-                    if not content and "retrieved_docs" in locals():
-                        pass
-                    st.info(source.get("content", "Content text snippet not provided."))
-                    
-        except Exception as query_err:
-            st.error(f"Error querying pipeline: {str(query_err)}")
-            st.info("Tip: If you're testing offline, ensure your settings are configured for Mock LLM fallback.")
+            result = pipeline.query(user_query, top_k=5, retrieval_method="hybrid")
+
+            # Answer
+            st.markdown('<div class="section-label">Answer</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="answer-card">{result["answer"]}</div>', unsafe_allow_html=True)
+
+            # Source chips
+            if result.get("sources"):
+                st.write("")
+                st.markdown('<div class="section-label">Sources</div>', unsafe_allow_html=True)
+                sources_html = ""
+                seen = set()
+                for src in result["sources"]:
+                    name = src.get("source", "unknown")
+                    if name not in seen:
+                        sources_html += f'<span class="source-chip">{name}</span>'
+                        seen.add(name)
+                st.markdown(sources_html, unsafe_allow_html=True)
+
+        except Exception as e:
+            st.error(f"Error: {str(e)}")
