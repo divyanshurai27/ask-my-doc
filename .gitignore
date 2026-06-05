@@ -45,8 +45,9 @@ env/
 htmlcov/
 .tox/
 
-# ChromaDB
+# ChromaDB & Documents
 data/chroma_db/
+data/uploaded_docs/
 
 # Logs
 *.log
