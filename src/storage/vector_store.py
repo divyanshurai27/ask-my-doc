@@ -8,6 +8,11 @@ from typing import List, Tuple
 import chromadb
 from chromadb.config import Settings
 from langchain_core.documents import Document
+
+# Suppress Hugging Face progress bars to prevent tqdm OSError [Errno 22] on Streamlit redirection
+import transformers
+transformers.utils.logging.disable_progress_bar()
+
 from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
@@ -57,7 +62,7 @@ class VectorStore:
         
         # Extract content and embeddings
         contents = [doc.page_content for doc in documents]
-        embeddings = self.embedding_model.encode(contents, show_progress_bar=True)
+        embeddings = self.embedding_model.encode(contents, show_progress_bar=False)
         
         # Prepare metadata (convert non-string values to strings for ChromaDB)
         metadatas = []
