@@ -75,8 +75,8 @@ class VectorStore:
         # Generate IDs
         ids = [doc.metadata.get("chunk_id", f"doc_{i}") for i, doc in enumerate(documents)]
         
-        # Add to collection
-        self.collection.add(
+        # Add to collection using upsert to avoid DuplicateIDError
+        self.collection.upsert(
             ids=ids,
             embeddings=embeddings.tolist(),
             documents=contents,
