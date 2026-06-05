@@ -107,13 +107,14 @@ Open your browser at `http://localhost:8501`.
 
 ### Using the CLI (Interactive Testing)
 
-You can instantly test your documents from the terminal without launching the UI:
+You can instantly ask questions and get answers from your documents via the terminal:
+
 1. Place your PDF/TXT files in the `data/sample_docs/` folder.
-2. Run the interactive CLI wrapper:
+2. Run the interactive CLI:
 ```bash
 python scripts/demo.py
 ```
-This command automatically loads your documents, chunks them, stores them in ChromaDB, and drops you into a live `Ask a question:` prompt. The terminal will directly output the AI's response along with exact inline citations!
+It will load your documents and open a prompt where you can type your question and get an instant answer with citations.
 
 ### Running Tests
 To run the full suite of 33 unit and integration tests:
