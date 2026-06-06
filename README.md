@@ -13,6 +13,7 @@
 - **Zero-Hallucination Guardrails**: System refuses to answer when the information isn't found in the documents.
 - **Local Embeddings**: Uses `all-MiniLM-L6-v2` locally for fast, free, and private embedding.
 - **Minimal Streamlit UI**: A clean, premium user interface with database clearing functionality.
+- **Cloud Native (GitHub Actions)**: Completely offload processing to GitHub Actions! Upload massive books (e.g., a 958-page PDF), and GitHub will effortlessly chunk, embed, and answer your questions directly in the cloud without using your local RAM.
 
 ---
 
@@ -115,6 +116,48 @@ You can instantly ask questions and get answers from your documents via the term
 python scripts/demo.py
 ```
 It will load your documents and open a prompt where you can type your question and get an instant answer with citations.
+
+### ☁️ Running in the Cloud (GitHub Actions)
+
+Don't want to use your own computer's memory to process a massive 1,000-page book? Run it on GitHub for free!
+
+1. **Configure Repository Secrets**:
+   Go to your GitHub repository -> **Settings** -> **Secrets and variables** -> **Actions** and add these two secrets:
+   - `GROQ_API_KEY`: Your Groq API key (starts with `gsk_`).
+   - `HF_TOKEN`: Your HuggingFace Read token (to bypass download rate limits).
+
+2. **Upload your PDF**:
+   Add your massive PDF to the `data/sample_docs/` folder and push it to your repository.
+
+3. **Ask the Bot**:
+   Go to the **Actions** tab in GitHub, select **Ask the Bot** on the left, click **Run workflow**, and type your question. GitHub will spin up a cloud server, chunk thousands of pages in seconds, securely embed them using your `HF_TOKEN`, and print the AI's answer directly in the logs!
+
+### 🗺️ Cloud Processing Flow (How it handles massive books)
+
+Here is exactly what happens under the hood when you feed the GitHub Action a massive document:
+
+```mermaid
+flowchart TD
+    subgraph Cloud["☁️ GitHub Actions Cloud Environment"]
+        direction TB
+        A["📄 Massive PDF Upload\n(e.g., 958 pages)"] --> B["✂️ Text Chunker\nSplits document into thousands of chunks\n(e.g. 4,104 chunks)"]
+        
+        subgraph Embed["🧠 Local Embedding Phase"]
+            B --> C{"🔑 HF_TOKEN Auth\n(Bypasses 429 Rate Limits)"}
+            C --> D["🤖 SentenceTransformer\nDownloads all-MiniLM-L6-v2"]
+            D --> E["💾 ChromaDB\n(Stores 4,104 Mathematical Vectors)"]
+        end
+        
+        subgraph Query["❓ Retrieval & Generation Phase"]
+            F["User Question"] --> G["🔍 Hybrid Search\n(Vector Similarity + BM25)"]
+            E --> G
+            G --> H["⚖️ Cross-Encoder Re-Ranker\n(Selects Top 3 Most Relevant Chunks)"]
+            H --> I{"🔑 GROQ_API_KEY Auth"}
+            I --> J["⚡ Groq API\n(llama-3.1-8b-instant)"]
+            J --> K["📝 Final Answer + Citations\n(Printed instantly to Action Logs)"]
+        end
+    end
+```
 
 ### Running Tests
 To run the full suite of 33 unit and integration tests:
