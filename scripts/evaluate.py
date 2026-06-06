@@ -272,19 +272,11 @@ def run_evaluation():
                     scores[metric.name] = 0.0
         except Exception as e:
             import traceback
-            logger.warning("RAGAS evaluation failed or was not fully configured:")
+            logger.error("RAGAS evaluation failed:")
             traceback.print_exc()
-            has_keys = False
-            
-    if not has_keys:
-        logger.info("Using simulated evaluation metrics (Mock LLM / Offline Mode)")
-        # Assign high-quality mock scores reflecting our mock LLM's performance
-        scores = {
-            "faithfulness": 0.95,
-            "answer_relevancy": 0.92,
-            "context_precision": 0.88,
-            "context_recall": 0.90,
-        }
+            raise e
+    else:
+        raise ValueError("Missing LLM API keys. Cannot run evaluation.")
         
     logger.info("=== EVALUATION RESULTS ===")
     for metric, score in scores.items():

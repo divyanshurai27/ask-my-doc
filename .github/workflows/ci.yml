@@ -51,4 +51,5 @@ jobs:
         python scripts/check_gates.py
       env:
         LLM_PROVIDER: groq
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         HF_TOKEN: ${{ secrets.HF_TOKEN }}
