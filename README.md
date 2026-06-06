@@ -21,27 +21,27 @@
 
 ```mermaid
 flowchart LR
-    A["📄 958-page PDF"] --> B["📖 Document Loader"]
-    B --> C["✂️ Chunker\n(4,104 pieces)"]
-    C --> D["🧠 Embeddings\n(all-MiniLM-L6-v2)"]
-    D --> E["💾 ChromaDB"]
-    F["❓ User Query"] --> G["🔍 Hybrid Retriever\n(BM25 + Vector)"]
+    A["📄 958-page PDF"] --> B["📖 PyPDF / LangChain\n(Document Loader)"]
+    B --> C["✂️ RecursiveCharacterTextSplitter\n(4,104 pieces, 600-tok, 100-overlap)"]
+    C --> D["🧠 HuggingFace BGE\n(SentenceTransformer: all-MiniLM-L6-v2)"]
+    D --> E["💾 ChromaDB\n(Vector & Metadata Store)"]
+    F["❓ User Query"] --> G["🔍 LangChain EnsembleRetriever\n(BM25 Sparse + Dense Vector RRF)"]
     E --> G
-    G --> R["📊 Cross-Encoder\n(ms-marco-MiniLM-L-6-v2)"]
-    R --> H["🤖 LLM (Groq)"]
+    G --> R["📊 Cross-Encoder Re-Ranker\n(ms-marco-MiniLM-L-6-v2)"]
+    R --> H["🤖 Groq API / Llama-3.1-8b\n(RAG Generation)"]
     H --> I["📝 Final Answer + Citations"]
 ```
 
-| Stage | What Happens |
-|-------|-------------|
-| **Ingest** | PDF/TXT/MD files are loaded and parsed into raw text |
-| **Chunk** | Text is split into 600-token chunks with 100-token overlap, assigning unique UUIDs |
-| **Embed** | Each chunk is converted to a 384-dim vector using SentenceTransformer |
-| **Store** | Vectors + metadata (e.g., `source_file`) are persisted in ChromaDB |
-| **Retrieve** | User query is searched against vectors and BM25, merged via Reciprocal Rank Fusion (RRF) |
-| **Re-Rank** | A Cross-Encoder model re-scores and re-ranks the candidate chunks |
-| **Generate** | Top-K refined chunks are sent to Groq LLM as context to generate a grounded answer |
-| **Evaluate** | `Ragas` evaluates the generated answer against the Golden Dataset for CI/CD checks |
+| Stage | What Happens | Technology Used |
+|-------|-------------|-----------------|
+| **Ingest** | PDF/TXT/MD files are loaded and parsed into raw text | `PyPDFLoader`, `TextLoader` |
+| **Chunk** | Text is split into 600-token chunks with 100-token overlap, assigning unique UUIDs | `RecursiveCharacterTextSplitter` |
+| **Embed** | Each chunk is converted to a 384-dim vector | `SentenceTransformers` (`all-MiniLM-L6-v2`) |
+| **Store** | Vectors + metadata (e.g., `source_file`) are persisted | `ChromaDB` (Persistent SQLite) |
+| **Retrieve** | User query is searched against vectors and BM25, merged via Reciprocal Rank Fusion (RRF) | `EnsembleRetriever`, `BM25Retriever` |
+| **Re-Rank** | A Cross-Encoder model re-scores and re-ranks the candidate chunks | `CrossEncoder` (`ms-marco-MiniLM-L-6-v2`) |
+| **Generate** | Top-K refined chunks are sent to the LLM as context to generate a grounded answer | `Groq API` (`llama-3.1-8b-instant`), `LangChain` |
+| **Evaluate** | Automated pipeline scoring using LLM-as-a-judge for CI/CD checks | `Ragas`, `pytest`, `llama-3.3-70b-versatile` |
 
 ---
 
