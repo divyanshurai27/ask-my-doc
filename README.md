@@ -21,15 +21,15 @@
 
 ```mermaid
 flowchart LR
-    A["📄 PDF Upload"] --> B["📖 Document Loader"]
-    B --> C["✂️ Chunker"]
-    C --> D["🧠 Embeddings"]
+    A["📄 958-page PDF"] --> B["📖 Document Loader"]
+    B --> C["✂️ Chunker\n(4,104 pieces)"]
+    C --> D["🧠 Embeddings\n(all-MiniLM-L6-v2)"]
     D --> E["💾 ChromaDB"]
-    F["❓ User Query"] --> G["🔍 Hybrid Retriever (BM25 + Vector)"]
+    F["❓ User Query"] --> G["🔍 Hybrid Retriever\n(BM25 + Vector)"]
     E --> G
-    G --> R["📊 Cross-Encoder Re-Ranker"]
+    G --> R["📊 Cross-Encoder\n(ms-marco-MiniLM-L-6-v2)"]
     R --> H["🤖 LLM (Groq)"]
-    H --> I["📝 Answer + Citations"]
+    H --> I["📝 Final Answer + Citations"]
 ```
 
 | Stage | What Happens |
@@ -131,33 +131,6 @@ Don't want to use your own computer's memory to process a massive 1,000-page boo
 
 3. **Ask the Bot**:
    Go to the **Actions** tab in GitHub, select **Ask the Bot** on the left, click **Run workflow**, and type your question. GitHub will spin up a cloud server, chunk thousands of pages in seconds, securely embed them using your `HF_TOKEN`, and print the AI's answer directly in the logs!
-
-### 🗺️ Cloud Processing Flow (How it handles massive books)
-
-Here is exactly what happens under the hood when you feed the GitHub Action a massive document:
-
-```mermaid
-flowchart TD
-    subgraph Cloud["☁️ GitHub Actions Cloud Environment"]
-        direction TB
-        A["📄 Massive PDF Upload\n(e.g., 958 pages)"] --> B["✂️ Text Chunker\nSplits document into thousands of chunks\n(e.g. 4,104 chunks)"]
-        
-        subgraph Embed["🧠 Local Embedding Phase"]
-            B --> C{"🔑 HF_TOKEN Auth\n(Bypasses 429 Rate Limits)"}
-            C --> D["🤖 SentenceTransformer\nDownloads all-MiniLM-L6-v2"]
-            D --> E["💾 ChromaDB\n(Stores 4,104 Mathematical Vectors)"]
-        end
-        
-        subgraph Query["❓ Retrieval & Generation Phase"]
-            F["User Question"] --> G["🔍 Hybrid Search\n(Vector Similarity + BM25)"]
-            E --> G
-            G --> H["⚖️ Cross-Encoder Re-Ranker\n(Selects Top 3 Most Relevant Chunks)"]
-            H --> I{"🔑 GROQ_API_KEY Auth"}
-            I --> J["⚡ Groq API\n(llama-3.1-8b-instant)"]
-            J --> K["📝 Final Answer + Citations\n(Printed instantly to Action Logs)"]
-        end
-    end
-```
 
 ### Running Tests
 To run the full suite of 33 unit and integration tests:
