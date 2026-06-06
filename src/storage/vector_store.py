@@ -4,6 +4,7 @@ Handles document embeddings and semantic search.
 """
 
 import logging
+import os
 from typing import List, Tuple
 import chromadb
 from chromadb.config import Settings
@@ -34,7 +35,12 @@ class VectorStore:
         
         # Initialize embedding model
         logger.info(f"Loading embedding model: {self.embedding_model_name}")
-        self.embedding_model = SentenceTransformer(self.embedding_model_name)
+        hf_token = os.environ.get("HF_TOKEN")
+        try:
+            self.embedding_model = SentenceTransformer(self.embedding_model_name, token=hf_token)
+        except TypeError:
+            # Fallback for older sentence-transformers versions
+            self.embedding_model = SentenceTransformer(self.embedding_model_name, use_auth_token=hf_token)
         
         # Initialize ChromaDB with persistent storage
         self.client = chromadb.PersistentClient(path=persist_dir)

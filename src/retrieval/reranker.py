@@ -4,6 +4,7 @@ Uses semantic cross-encoders to re-rank retrieved documents.
 """
 
 import logging
+import os
 from typing import List, Tuple
 from langchain_core.documents import Document
 from sentence_transformers import CrossEncoder
@@ -23,7 +24,10 @@ class ReRanker:
                        Defaults to a multilingual model optimized for speed
         """
         logger.info(f"Loading cross-encoder model: {model_name}")
-        self.model = CrossEncoder(model_name)
+        hf_token = os.environ.get("HF_TOKEN")
+        
+        # In recent versions of sentence-transformers, model_kwargs can be passed
+        self.model = CrossEncoder(model_name, automodel_args={"token": hf_token} if hf_token else None)
         self.model_name = model_name
         logger.info("Cross-encoder model loaded")
 
