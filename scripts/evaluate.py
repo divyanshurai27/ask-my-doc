@@ -246,8 +246,11 @@ def run_evaluation():
                     temperature=0
                 )
                 ragas_llm = LangchainLLM(llm=eval_llm)
+                import os
+                hf_token = os.environ.get("HF_TOKEN")
                 eval_embeddings = HuggingfaceEmbeddings(
-                    model_name=settings.embedding_model
+                    model_name=settings.embedding_model,
+                    model_kwargs={"token": hf_token} if hf_token else {}
                 )
                 
                 # Assign custom model configurations to Ragas metrics
