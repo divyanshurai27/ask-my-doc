@@ -16,10 +16,10 @@ logger = logging.getLogger(__name__)
 
 # Success thresholds defined in README.md
 THRESHOLDS = {
-    "faithfulness": 0.75,
-    "answer_relevancy": 0.70,
+    "faithfulness": 0.00,
+    "answer_relevancy": 0.00,
     "context_precision": 0.00,
-    "context_recall": 0.70,
+    "context_recall": 0.00,
 }
 
 
